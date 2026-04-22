@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express'
 import passport from 'passport'
 import { Strategy as GoogleStrategy, Profile } from 'passport-google-oauth20'
 import { env } from '../config/env'
+import { getAccessTokenCookieOptions } from '../utils/cookies'
 import { findOrCreateGoogleUser } from '../services/auth.service'
 import { signAccessToken } from '../utils/jwt'
 import {
@@ -9,6 +10,7 @@ import {
 	AuthenticatedRequest,
 } from '../middleware/auth.middleware'
 import { User } from '../models/user.model'
+import { asyncHandler } from '../utils/async-handler'
 
 const router = Router()
 
@@ -62,7 +64,7 @@ router.get(
 		session: false,
 		failureRedirect: `${env.FRONTEND_URL}/login?error=google_auth_failed`,
 	}),
-	async (req: Request, res: Response) => {
+	asyncHandler(async (req: Request, res: Response) => {
 		const authUser = req.user as unknown as {
 			userId: string
 			email: string
@@ -72,40 +74,34 @@ router.get(
 			email: authUser.email,
 		})
 
-		res.cookie('accessToken', token, {
-			httpOnly: true,
-			secure: env.NODE_ENV === 'production',
-			sameSite: 'lax',
-			maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
-		})
+		res.cookie('accessToken', token, getAccessTokenCookieOptions())
 
 		return res.redirect(`${env.FRONTEND_URL}`)
-	},
+	}),
 )
 
 router.get(
 	'/me',
 	requireAuth,
-	async (req: AuthenticatedRequest, res: Response) => {
+	asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
 		const userId = req.auth?.userId
 		const user = await User.findById(userId).select('-__v')
 
 		return res.status(200).json({
 			user,
 		})
-	},
+	}),
 )
 
-router.post('/logout', (_req: Request, res: Response) => {
-	res.clearCookie('accessToken', {
-		httpOnly: true,
-		secure: env.NODE_ENV === 'production',
-		sameSite: 'lax',
-	})
+router.post(
+	'/logout',
+	asyncHandler(async (_req: Request, res: Response) => {
+		res.clearCookie('accessToken', getAccessTokenCookieOptions())
 
-	return res.status(200).json({
-		message: 'Logged out successfully',
-	})
-})
+		return res.status(200).json({
+			message: 'Logged out successfully',
+		})
+	}),
+)
 
 export default router

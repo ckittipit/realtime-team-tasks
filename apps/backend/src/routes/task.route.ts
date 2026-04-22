@@ -15,6 +15,7 @@ import {
 	validateUpdateTask,
 } from '../validators/task.validator'
 import { publishTaskEvent } from '../lib/socket'
+import { asyncHandler } from '../utils/async-handler'
 
 const router = Router()
 
@@ -22,7 +23,7 @@ const router = Router()
 router.post(
 	'/',
 	requireAuth,
-	async (req: AuthenticatedRequest, res: Response) => {
+	asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
 		const error = validateCreateTask(req.body)
 		if (error) return res.status(400).json({ message: error })
 
@@ -40,24 +41,24 @@ router.post(
 		})
 
 		return res.status(201).json({ task })
-	},
+	}),
 )
 
 // READ ALL
 router.get(
 	'/',
 	requireAuth,
-	async (req: AuthenticatedRequest, res: Response) => {
+	asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
 		const tasks = await getTasksByUser(req.auth!.userId)
 		return res.json({ tasks })
-	},
+	}),
 )
 
 // READ ONE
 router.get(
 	'/:id',
 	requireAuth,
-	async (req: AuthenticatedRequest, res: Response) => {
+	asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
 		const task = await getTaskById(String(req.params.id))
 
 		if (!task) return res.status(404).json({ message: 'Task not found' })
@@ -67,14 +68,14 @@ router.get(
 			return res.status(403).json({ message: 'Forbidden' })
 
 		return res.json({ task })
-	},
+	}),
 )
 
 // UPDATE
 router.patch(
 	'/:id',
 	requireAuth,
-	async (req: AuthenticatedRequest, res: Response) => {
+	asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
 		const error = validateUpdateTask(req.body)
 		if (error) return res.status(400).json({ message: error })
 
@@ -97,14 +98,14 @@ router.patch(
 		})
 
 		return res.json({ task: updated })
-	},
+	}),
 )
 
 // DELETE
 router.delete(
 	'/:id',
 	requireAuth,
-	async (req: AuthenticatedRequest, res: Response) => {
+	asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
 		const task = await getTaskById(String(req.params.id))
 
 		if (!task) return res.status(404).json({ message: 'Task not found' })
@@ -124,7 +125,7 @@ router.delete(
 		})
 
 		return res.json({ message: 'Task deleted' })
-	},
+	}),
 )
 
 export default router
