@@ -1,0 +1,31 @@
+{
+	"name": "realtime-team-tasks",
+	"private": true,
+	"workspaces": [
+		"apps/*",
+		"packages/*"
+	],
+	"scripts": {
+		"dev:frontend": "npm run dev --workspace=frontend",
+		"dev:backend": "npm run dev --workspace=backend",
+		"docker:up": "docker compose up --build",
+		"docker:down": "docker compose down",
+		"docker:logs": "docker compose logs -f",
+		"docker:backend": "docker compose up -d backend mongodb redis"
+	},
+	"dependencies": {
+		"cookie-parser": "^1.4.7",
+		"jsonwebtoken": "^9.0.3",
+		"mongoose": "^9.4.1",
+		"passport": "^0.7.0",
+		"passport-google-oauth20": "^2.0.0",
+		"redis": "^5.11.0"
+	},
+	"devDependencies": {
+		"@types/cookie-parser": "^1.4.10",
+		"@types/jsonwebtoken": "^9.0.10",
+		"@types/mongoose": "^5.11.96",
+		"@types/passport": "^1.0.17",
+		"@types/passport-google-oauth20": "^2.0.17"
+	}
+}
