@@ -100,7 +100,7 @@ router.patch(
 		await publishTaskEvent({
 			type: 'task:updated',
 			payload: {
-				taskId: req.params.id,
+				taskId: String(req.params.id),
 				userId: req.auth!.userId,
 			},
 		})
