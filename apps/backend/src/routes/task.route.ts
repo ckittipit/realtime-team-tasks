@@ -16,19 +16,25 @@ import {
 } from '../validators/task.validator'
 import { publishTaskEvent } from '../lib/socket'
 import { asyncHandler } from '../utils/async-handler'
+import { ok, created, badRequest, notFound } from '../utils/response'
+import { getOwnedTaskOrThrow } from '../services/task.access.service'
 
 const router = Router()
 
-// CREATE
 router.post(
 	'/',
 	requireAuth,
 	asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-		const error = validateCreateTask(req.body)
-		if (error) return res.status(400).json({ message: error })
+		const result = validateCreateTask(req.body)
+
+		if (!result.isValid) {
+			return badRequest(res, result.message || 'Invalid task payload')
+		}
 
 		const task = await createTask({
-			...req.body,
+			title: req.body.title,
+			description: req.body.description,
+			status: req.body.status,
 			createdBy: req.auth!.userId,
 		})
 
@@ -40,81 +46,80 @@ router.post(
 			},
 		})
 
-		return res.status(201).json({ task })
+		return created(res, { task })
 	}),
 )
 
-// READ ALL
 router.get(
 	'/',
 	requireAuth,
 	asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
 		const tasks = await getTasksByUser(req.auth!.userId)
-		return res.json({ tasks })
+		return ok(res, { tasks })
 	}),
 )
 
-// READ ONE
 router.get(
 	'/:id',
 	requireAuth,
 	asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
 		const task = await getTaskById(String(req.params.id))
 
-		if (!task) return res.status(404).json({ message: 'Task not found' })
+		if (!task) {
+			return notFound(res, 'Task not found')
+		}
 
-		// authorization
-		if (String(task.createdBy) !== req.auth!.userId)
-			return res.status(403).json({ message: 'Forbidden' })
+		if (String(task.createdBy) !== req.auth!.userId) {
+			const error = new Error('Forbidden') as Error & { status?: number }
+			error.status = 403
+			throw error
+		}
 
-		return res.json({ task })
+		return ok(res, { task })
 	}),
 )
 
-// UPDATE
 router.patch(
 	'/:id',
 	requireAuth,
 	asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-		const error = validateUpdateTask(req.body)
-		if (error) return res.status(400).json({ message: error })
+		const result = validateUpdateTask(req.body)
 
-		const task = await getTaskById(String(req.params.id))
+		if (!result.isValid) {
+			return badRequest(res, result.message || 'Invalid task payload')
+		}
 
-		if (!task) return res.status(404).json({ message: 'Task not found' })
-
-		// authorization
-		if (String(task.createdBy) !== req.auth!.userId)
-			return res.status(403).json({ message: 'Forbidden' })
+		await getOwnedTaskOrThrow(String(req.params.id), req.auth!.userId)
 
 		const updated = await updateTask(String(req.params.id), req.body)
+
+		if (!updated) {
+			return notFound(res, 'Task not found')
+		}
 
 		await publishTaskEvent({
 			type: 'task:updated',
 			payload: {
-				taskId: String(req.params.id),
+				taskId: req.params.id,
 				userId: req.auth!.userId,
 			},
 		})
 
-		return res.json({ task: updated })
+		return ok(res, { task: updated })
 	}),
 )
 
-// DELETE
 router.delete(
 	'/:id',
 	requireAuth,
 	asyncHandler(async (req: AuthenticatedRequest, res: Response) => {
-		const task = await getTaskById(String(req.params.id))
+		await getOwnedTaskOrThrow(String(req.params.id), req.auth!.userId)
 
-		if (!task) return res.status(404).json({ message: 'Task not found' })
+		const deletedTask = await deleteTask(String(req.params.id))
 
-		// authorization
-		if (String(task.createdBy) !== req.auth!.userId)
-			return res.status(403).json({ message: 'Forbidden' })
-
-		await deleteTask(String(req.params.id))
+		if (!deletedTask) {
+			return notFound(res, 'Task not found')
+		}
 
 		await publishTaskEvent({
 			type: 'task:deleted',
@@ -124,7 +129,7 @@ router.delete(
 			},
 		})
 
-		return res.json({ message: 'Task deleted' })
+		return ok(res, { message: 'Task deleted' })
 	}),
 )
 
